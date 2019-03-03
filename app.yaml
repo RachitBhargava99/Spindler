@@ -1,6 +1,6 @@
 service: spindler
 runtime: python37
-entrypoint: gunicorn -b :$PORT run:app
+entrypoint: gunicorn -t 120 -b :$PORT run:app
 
 instance_class: F1
 
