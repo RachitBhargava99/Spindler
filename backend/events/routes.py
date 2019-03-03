@@ -60,7 +60,8 @@ def search_now():
                 name=each['data'][0]['title'],
                 center=each['data'][0]['center'],
                 last_updated=datetime.strptime(each['data'][0]['date_created'], "%Y-%m-%dT%H:%M:%SZ"),
-                thumb_img=[x['href'] for x in each['links'] if x['render'] is not None and x['render'] == "image"][0],
+                thumb_img=[x['href'] for x in each['links']
+                           if x.get('render') is not None and x['render'] == "image"][0],
                 description=each['data'][0]['description'],
                 nasa_id=each['data'][0]['nasa_id']
             )
