@@ -55,7 +55,7 @@ def search_now():
     num_res = 0
 
     for each in received_res:
-        if (Result.query.filter_by(nasa_id=each['nasa_id'])).first() is None:
+        if (Result.query.filter_by(nasa_id=each['data'][0]['nasa_id'])).first() is None:
             new_res = Result(
                 name=each['data'][0]['title'],
                 center=each['data'][0]['center'],

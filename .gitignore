@@ -27,7 +27,7 @@ hs_err_pid*
 venv/
 
 # pycache files
-*.__pycache__/
+__pycache__/
 
 # Google Cloud Application Settings
 */app.yaml
