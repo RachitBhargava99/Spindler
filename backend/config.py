@@ -8,15 +8,12 @@ class Config:
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 465
     MAIL_USE_SSL = True
-    MAIL_USERNAME = 'rachitbhargava99@gmail.com'
-    MAIL_PASSWORD = 'Ananya88#'
-    MAPS_API_KEY = 'AIzaSyAs5sA8X7MR-vbuNNxfJ4a-xSiUeOLtg-U'
-    PROJECT_ID = 'thinger'
-    DATA_BACKEND = 'cloudsql'
-    CLOUDSQL_USER = 'root'
-    CLOUDSQL_PASSWORD = ''
-    CLOUDSQL_DATABASE = 'thinger_sql'
-    CLOUDSQL_CONNECTION_NAME = 'thinger:us-east1:thinger'
+    PROJECT_ID = os.environ.get('PROJECT_ID')
+    DATA_BACKEND = os.environ.get('DATA_BACKEND')
+    CLOUDSQL_USER = os.environ.get('CLOUDSQL_USER')
+    CLOUDSQL_PASSWORD = os.environ.get('CLOUDSQL_PASSWORD')
+    CLOUDSQL_DATABASE = os.environ.get('CLOUDSQL_DATABASE')
+    CLOUDSQL_CONNECTION_NAME = os.environ.get('CLOUDSQL_CONNECTION_NAME')
     SQLALCHEMY_DATABASE_URI = (
         'mysql+pymysql://{user}:{password}@localhost/{database}?unix_socket=/cloudsql/{connection_name}').format(
         user=CLOUDSQL_USER, password=CLOUDSQL_PASSWORD, database=CLOUDSQL_DATABASE,

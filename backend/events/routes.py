@@ -6,7 +6,7 @@ from sqlalchemy import and_
 import geocoder
 import requests
 from backend import config
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 events = Blueprint('queues', __name__)
 
@@ -52,4 +52,20 @@ def search_now():
         result = query.json()
         received_res += result['collection']['items']
 
-    return json.dumps({'data': received_res})
+    num_res = 0
+
+    for each in received_res:
+        if (Result.query.filter_by(nasa_id=each['nasa_id'])).first() is None:
+            new_res = Result(
+                name=each['data'][0]['title'],
+                center=each['data'][0]['center'],
+                last_updated=datetime.strptime(each['data'][0]['date_created'], "%Y-%m-%dT%H:%M:%SZ"),
+                thumb_img=[x['href'] for x in each['links'] if x['render'] is not None and x['render'] == "image"][0],
+                description=each['data'][0]['description'],
+                nasa_id=each['data'][0]['nasa_id']
+            )
+            db.session.add(new_res)
+            num_res += 1
+    db.session.commit()
+
+    return json.dumps({'data': received_res, 'num_res': num_res})

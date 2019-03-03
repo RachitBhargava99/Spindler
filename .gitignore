@@ -28,3 +28,6 @@ venv/
 
 # pycache files
 *.__pycache__/
+
+# Google Cloud Application Settings
+*/app.yaml

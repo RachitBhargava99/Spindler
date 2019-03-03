@@ -58,6 +58,7 @@ class Result(db.Model):
     last_updated = db.Column(db.DateTime, nullable=True, default=datetime.now())
     thumb_img = db.Column(db.String(1023), nullable=False)
     description = db.Column(db.String(16383), nullable=True)
+    nasa_id = db.Column(db.String(1023), nullable=False, unique=True)
 
     def __repr__(self):
         return f"Result ID {self.id}"
