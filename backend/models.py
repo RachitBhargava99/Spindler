@@ -70,7 +70,6 @@ class SearchStream(db.Model):
     center = db.Column(db.String(127), nullable=False, default="")
     location = db.Column(db.String(1023))
     media_type = db.Column(db.String(63))
-    nasa_id = db.Column(db.String(1023))
     photographer = db.Column(db.String(127))
 
 
