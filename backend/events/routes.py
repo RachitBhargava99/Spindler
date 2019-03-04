@@ -1,5 +1,5 @@
 from flask import Blueprint, request, current_app
-from backend.models import User, Result, Fav, SearchStream, Keyword, SearchKeywordRel
+from backend.models import User, Result, Fav, SearchStream, Keyword, SearchKeywordRel, Search, SearchKeyRel
 from backend import db, mail
 import json
 from sqlalchemy import and_
@@ -36,6 +36,32 @@ def search_now():
         'year_start': request_json['year_start'],
         'year_end': request_json['year_end']
     }
+
+    new_search = Search(
+        q=request_json['q'],
+        center=request_json['center'],
+        description=request_json['description'],
+        description_508=request_json['description_508'],
+        location=request_json['location'],
+        media_type=request_json['media_type'],
+        nasa_id=request_json['nasa_id'],
+        photographer=request_json['photographer'],
+        secondary_creator=request_json['secondary_creator'],
+        title=request_json['title'],
+        year_start=request_json['year_start'],
+        year_end=request_json['year_end']
+    )
+
+    if request_json['user_id'] != -1:
+        new_search.user_id = request_json['user_id']
+
+    db.session.add(new_search)
+
+    for keyword in request_json['keywords']:
+        key = Keyword.query.filter_by(name=keyword).first()
+        key = key if key is not None else Keyword(name=keyword)
+        new_search_key_rel = SearchKeyRel(se_id=new_search.id, kw_id=key.id)
+        db.session.add(new_search_key_rel)
 
     map_to_send = {}
     for each in map_received:
@@ -251,3 +277,22 @@ Spindler Team'''
             mail.send(msg)
 
     return json.dumps({'status': 1, 'num_adds': num_adds, 'num_stream_sends': num_stream_sends})
+
+
+@events.route('/search/history', methods=['POST'])
+def get_search_history():
+    request_json = request.get_json()
+
+    auth_token = request_json['auth_token']
+    user = User.verify_auth_token(auth_token)
+
+    if user is None:
+        return json.dumps({'status': 0, 'error': "User credentials invalid"})
+
+    all_search = Search.query.filter_by(user_id=user.id)
+    final_res = []
+
+    for each in all_search:
+        final_res.append({'id': each.id, 'q': each.q, 'timestamp': each.timestamp})
+
+    return json.dumps({'status': 1, 'data': final_res})
