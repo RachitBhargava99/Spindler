@@ -106,9 +106,9 @@ def add_to_stream():
     request_json = request.get_json()
 
     auth_token = request_json['auth_token']
-    user_id = User.verify_auth_token(auth_token)
+    user = User.verify_auth_token(auth_token)
 
-    if user_id is None:
+    if user is None:
         return json.dumps({'status': 0, 'error': "User credentials invalid"})
 
     q = request_json['q']
@@ -118,7 +118,15 @@ def add_to_stream():
     photographer = request_json['photographer']
     keywords = request_json['keywords'] ##list of keywords
 
-    new_stream = SearchStream(q=q, center=center, location=location, media_type=media_type, photographer=photographer)
+    new_stream = SearchStream(
+        q=q,
+        center=center,
+        location=location,
+        media_type=media_type,
+        photographer=photographer,
+        user_id=user.id
+    )
+
     db.session.add(new_stream)
 
     for each in keywords:
@@ -131,6 +139,31 @@ def add_to_stream():
             db.session.add(new_key)
             new_sw_rel = SearchKeywordRel(ss_id=new_stream.id, kw_id=new_key.id)
             db.session.add(new_sw_rel)
+    db.session.commit()
+
+    return json.dumps({'status': 1})
+
+
+@events.route('/result/stream/remove', methods=['POST'])
+def remove_from_stream():
+    request_json = request.get_json()
+
+    auth_token = request_json['auth_token']
+    user = User.verify_auth_token(auth_token)
+
+    if user is None:
+        return json.dumps({'status': 0, 'error': "User credentials invalid"})
+
+    ss_id = request_json['ss_id']
+    ss = SearchStream.query.filter_by(id=ss_id).first()
+
+    if ss is None:
+        return json.dumps({'status': 0, 'error': "Incorrect Parameters Provided. Please contact system administrator."})
+
+    if ss.user_id != user.id and not user.isAdmin:
+        return json.dumps({'status': 0, 'error': "User Not Authorized"})
+
+    ss.status = False
     db.session.commit()
 
     return json.dumps({'status': 1})

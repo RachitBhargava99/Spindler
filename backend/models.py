@@ -71,6 +71,8 @@ class SearchStream(db.Model):
     location = db.Column(db.String(1023))
     media_type = db.Column(db.String(63))
     photographer = db.Column(db.String(127))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    status = db.Column(db.Boolean, nullable=False, default=True)
 
 
 class Keyword(db.Model):
