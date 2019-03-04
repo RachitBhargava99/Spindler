@@ -352,3 +352,18 @@ def get_search_history():
         final_res.append({'id': each.id, 'q': each.q, 'timestamp': each.timestamp})
 
     return json.dumps({'status': 1, 'data': final_res})
+
+
+@events.route('/search/most', methods=['POST'])
+def get_most_searched():
+    all_search = Search.query.all()
+    final_dict = {}
+
+    for each in all_search:
+        final_dict[each.name.lower()] = final_dict[each.name.lower()] + 1\
+            if final_dict.get(each.name.lower()) is not None else 1
+
+    final_tup = [(final_dict[x], x) for x in final_dict]
+    final_tup.sort(reverse=True)
+
+    return json.dumps({'status': 1, 'list': final_tup})
