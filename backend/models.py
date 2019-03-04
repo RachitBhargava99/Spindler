@@ -68,9 +68,9 @@ class SearchStream(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     q = db.Column(db.String(1023), nullable=False, default="")
     center = db.Column(db.String(127), nullable=False, default="")
-    location = db.Column(db.String(1023))
-    media_type = db.Column(db.String(63))
-    photographer = db.Column(db.String(127))
+    location = db.Column(db.String(1023), nullable=False, default="")
+    media_type = db.Column(db.String(63), nullable=False, default="")
+    photographer = db.Column(db.String(127), nullable=False, default="")
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     status = db.Column(db.Boolean, nullable=False, default=True)
 

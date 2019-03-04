@@ -1,12 +1,13 @@
 from flask import Blueprint, request, current_app
 from backend.models import User, Result, Fav, SearchStream, Keyword, SearchKeywordRel
-from backend import db
+from backend import db, mail
 import json
 from sqlalchemy import and_
 import geocoder
 import requests
 from backend import config
 from datetime import timedelta, datetime
+from flask_mail import Message
 
 events = Blueprint('queues', __name__)
 
@@ -167,3 +168,86 @@ def remove_from_stream():
     db.session.commit()
 
     return json.dumps({'status': 1})
+
+
+@events.route('/result/stream', methods=['GET'])
+def stream():
+    all_ss = SearchStream.query.filter_by(status=True)
+    num_adds = 0
+    num_stream_sends = 0
+    for ss in all_ss:
+        map_received = {
+            'q': ss.q,
+            'center': ss.center,
+            'location': ss.location,
+            'media_type': ss.media_type,
+            'photograph': ss.photograph,
+            'keywords': ",".join([Keyword.query.filter_by(id=x.kw_id).first().name
+                                  for x in SearchKeywordRel.query.filter_by(ss_id=ss.id)])
+        }
+
+        curr_user = ss.user_id
+
+        map_to_send = {}
+        for each in map_received:
+            if map_received[each] != '':
+                map_to_send[each] = map_received[each]
+
+        query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
+        result = query.json()
+        received_res = result['collection']['items']  ##storing search results until all are accumulated
+        num_p_extra = result['collection']['metadata']['total_hits'] // 100  ##number of more pages to load data from
+
+        for i in range(2, num_p_extra + 2):
+            map_to_send['page'] = i
+            query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
+            result = query.json()
+            received_res += result['collection']['items']
+
+        num_res = 0
+
+        new_adds = []
+
+        for each in received_res:
+            if (Result.query.filter_by(nasa_id=each['data'][0]['nasa_id'])).first() is None:
+                new_res = Result(
+                    name=each['data'][0]['title'],
+                    center=each['data'][0]['center']
+                    if each['data'][0].get('center') is not None else "No Center Information Provided",
+                    last_updated=datetime.strptime(each['data'][0]['date_created'], "%Y-%m-%dT%H:%M:%SZ"),
+                    thumb_img=([x['href'] for x in each['links']
+                                if x.get('render') is not None and x['render'] == "image"][0])
+                    if each.get('links') is not None else "",
+                    description=((each['data'][0]['description'])
+                                 if len(each['data'][0]['description']) <= 16383
+                                 else each['data'][0]['description'][:16379] + "...")
+                    if each['data'][0].get('description') is not None else "",
+                    nasa_id=each['data'][0]['nasa_id']
+                )
+                new_adds.append(new_res)
+                db.session.add(new_res)
+                num_res += 1
+        db.session.commit()
+
+        new_add_str = "\n".join(
+            (current_app.config['CURRENT_URL'] + current_app.config['IMG_URL'] + str(x.id)) for x in new_adds
+        )
+
+        num_adds += len(new_adds)
+
+        if len(new_adds) != 0:
+            num_stream_sends += 1
+            msg = Message('Investoreal Login Credentials', sender='rachitbhargava99@gmail.com',
+                          recipients=[curr_user.email])
+            msg.body = f'''Hi {curr_user.name},
+
+New images matching your query were recently added by NASA.
+
+Below-mentioned are links to the images that were added.
+{new_add_str}
+
+Cheers,
+Spindler Team'''
+            mail.send(msg)
+
+    return json.dumps({'status': 1, 'num_adds': num_adds, 'num_stream_sends': num_stream_sends})

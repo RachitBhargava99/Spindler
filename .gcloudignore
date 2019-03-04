@@ -21,3 +21,6 @@ __pycache__/
 # Virtual Environment Files:
 .idea/
 venv/
+
+# Suppressing cron jobs until alpha release
+/cron.yaml

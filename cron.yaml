@@ -1,0 +1,4 @@
+cron:
+- description: "Daily Streaming Job"
+  url: /result/stream
+  schedule: every day 00:00

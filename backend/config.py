@@ -4,7 +4,7 @@ import os
 class Config:
     SECRET_KEY = '0917b13a9091915d54b6336f45909539cce452b3661b21f386418a257883b30a'
     ENDPOINT_ROUTE = ''
-    CURRENT_URL = 'https://thinger.appspot.com/'
+    CURRENT_URL = 'https://spindler.thinger.appspot.com/'
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 465
     MAIL_USE_SSL = True
@@ -23,3 +23,4 @@ class Config:
     SEARCH_URL = 'search'
     META_DATA_URL = 'metadata/'
     MEDIA_DATA_URL = 'asset/'
+    IMG_URL = 'asset/img/'
