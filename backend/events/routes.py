@@ -354,7 +354,7 @@ def get_search_history():
     return json.dumps({'status': 1, 'data': final_res})
 
 
-@events.route('/search/most', methods=['POST'])
+@events.route('/search/most', methods=['GET'])
 def get_most_searched():
     all_search = Search.query.all()
     final_dict = {}
