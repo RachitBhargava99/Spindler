@@ -1,5 +1,5 @@
 from flask import Blueprint, request, current_app
-from backend.models import User, Result
+from backend.models import User, Result, Fav
 from backend import db
 import json
 from sqlalchemy import and_
@@ -74,3 +74,17 @@ def search_now():
     db.session.commit()
 
     return json.dumps({'data': received_res, 'num_res': num_res, 'num_ret': result['collection']['metadata']['total_hits']})
+
+
+@events.route('/result/fav', methods=['POST'])
+def add_to_favorite():
+    request_json = request.get_json()
+
+    user_id = request_json['user_id']
+    result_id = request_json['result_id']
+
+    new_fav = Fav(user_id=user_id, res_id=result_id)
+    db.session.add(new_fav)
+    db.session.commit()
+
+    return json.dumps({'status': 1})

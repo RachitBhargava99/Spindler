@@ -62,3 +62,24 @@ class Result(db.Model):
 
     def __repr__(self):
         return f"Result ID {self.id}"
+
+
+class SearchStream(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    q = db.Column(db.String(1023), nullable=False, default="")
+    center = db.Column(db.String(127), nullable=False, default="")
+    location = db.Column(db.String(1023))
+    media_type = db.Column(db.String(63))
+    nasa_id = db.Column(db.String(1023))
+    photographer = db.Column(db.String(127))
+
+
+class Keyword(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+
+
+class SearchKeywordRel(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ss_id = db.Column(db.Integer, db.ForeignKey('searchstream.id'), nullable=False)
+    kw_id = db.Column(db.Integer, db.ForeignKey('keyword.id'), nullable=False)

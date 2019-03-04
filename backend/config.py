@@ -21,3 +21,5 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     BASE_URL = 'https://images-api.nasa.gov/'
     SEARCH_URL = 'search'
+    META_DATA_URL = 'metadata/'
+    MEDIA_DATA_URL = 'asset/'
