@@ -9,6 +9,7 @@ class Fav(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     res_id = db.Column(db.Integer, db.ForeignKey('result.id'), nullable=False)
+    status = db.Column(db.Boolean, nullable=False, default=True)
 
     def __repr__(self):
         return f"Favorite Relationship ID {self.id}"

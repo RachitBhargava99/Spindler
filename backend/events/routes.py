@@ -114,18 +114,74 @@ def add_to_favorite():
     request_json = request.get_json()
 
     auth_token = request_json['auth_token']
-    user_id = User.verify_auth_token(auth_token)
+    user = User.verify_auth_token(auth_token)
 
-    if user_id is None:
+    if user is None:
         return json.dumps({'status': 0, 'error': "User credentials invalid"})
 
     result_id = request_json['result_id']
 
-    new_fav = Fav(user_id=user_id, res_id=result_id)
+    new_fav = Fav(user_id=user.id, res_id=result_id)
     db.session.add(new_fav)
     db.session.commit()
 
     return json.dumps({'status': 1})
+
+@events.route('/result/unfav', methods=['POST', 'GET'])
+def remove_from_favorite():
+    request_json = request.get_json()
+
+    auth_token = request_json['auth_token']
+    user = User.verify_auth_token(auth_token)
+
+    if user is None:
+        return json.dumps({'status': 0, 'error': "User Not Authenticated"})
+
+    res_id = request_json['res_id']
+    res = Result.query.filter_by(id=res_id).first()
+
+    if res is None:
+        return json.dumps({'status': 0, 'error': "Incorrect Parameters Provided. Please contact system administrator."})
+
+    fav = Fav.query.filter_by(user_id=user.id, res_id=res_id).first()
+
+    if fav is None:
+        return json.dumps({'status': 0, 'error': "Item Not Marked Favorite."})
+
+    fav.status = 0
+
+    db.session.commit()
+
+    return json.dumps({'status': 1, 'fav_id': fav.id})
+
+
+@events.route('/result/fav/show_all', methods=['POST', 'GET'])
+def show_all_favorites():
+    request_json = request.get_json()
+
+    auth_token = request_json['auth_token']
+    user = User.verify_auth_token(auth_token)
+
+    if user is None:
+        return json.dumps({'status': 0, 'error': "User Not Authenticated"})
+
+    all_favs = Fav.query.filter_by(user_id=user.id)
+
+    final_res = []
+
+    for each in all_favs:
+        result = Result.query.filter_by(id=each.res_id)
+        final_res.append({
+            'id': result.id,
+            'name': result.name,
+            'center': result.center,
+            'last_updated': result.last_updated.strftime("%B %d, %Y %I:%M %p"),
+            'thumb_img': result.thumb_img,
+            'description': result.description,
+            'nasa_id': result.nasa_id
+        })
+
+    return json.dumps({'status': 1, 'data': final_res})
 
 
 @events.route('/result/stream/add', methods=['POST'])
