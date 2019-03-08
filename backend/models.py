@@ -58,7 +58,7 @@ class Result(db.Model):
     center = db.Column(db.String(127), nullable=True)
     last_updated = db.Column(db.DateTime, nullable=True, default=datetime.now())
     thumb_img = db.Column(db.String(1023), nullable=False)
-    description = db.Column(db.String(16383), nullable=True)
+    description = db.Column(db.Text(16383), nullable=True)
     nasa_id = db.Column(db.String(1023), nullable=False, unique=True)
 
     def __repr__(self):
@@ -78,12 +78,12 @@ class SearchStream(db.Model):
 
 class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
+    name = db.Column(db.String(127), nullable=False)
 
 
 class SearchKeywordRel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    ss_id = db.Column(db.Integer, db.ForeignKey('searchstream.id'), nullable=False)
+    ss_id = db.Column(db.Integer, db.ForeignKey('search_stream.id'), nullable=False)
     kw_id = db.Column(db.Integer, db.ForeignKey('keyword.id'), nullable=False)
 
 
@@ -91,8 +91,8 @@ class Search(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     q = db.Column(db.String(1023), nullable=False, default=True)
     center = db.Column(db.String(127), nullable=True)
-    description = db.Column(db.String(16383), nullable=True)
-    description_508 = db.Column(db.String(16383), nullable=True)
+    description = db.Column(db.Text(16383), nullable=True)
+    description_508 = db.Column(db.Text(16383), nullable=True)
     location = db.Column(db.String(127), nullable=True)
     media_type = db.Column(db.String(127), nullable=True)
     nasa_id = db.Column(db.String(127), nullable=True)
