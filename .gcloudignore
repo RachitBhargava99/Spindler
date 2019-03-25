@@ -22,5 +22,8 @@ __pycache__/
 .idea/
 venv/
 
-# Suppressing cron jobs until alpha release
-/cron.yaml
+# Suppressing cron jobs until alpha release - UPLOAD ENABLED
+# /cron.yaml
+
+# Ignoring test files upload
+tests/

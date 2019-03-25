@@ -1,5 +1,6 @@
 from flask import Blueprint, request, current_app
-from backend.models import User, Result, Fav, SearchStream, Keyword, SearchKeywordRel, Search, SearchKeyRel
+from backend.models import User, Result, Fav, SearchStream, Keyword, SearchKeywordRel, Search, SearchKeyRel, \
+    StreamResult
 from backend import db, mail
 import json
 from sqlalchemy import and_
@@ -8,6 +9,8 @@ import requests
 from backend import config
 from datetime import timedelta, datetime
 from flask_mail import Message
+from backend.events.utils import get_metadata
+import asyncio
 
 events = Blueprint('queues', __name__)
 
@@ -33,8 +36,9 @@ def search_now():
         'photographer': request_json['photographer'],
         'secondary_creator': request_json['secondary_creator'],
         'title': request_json['title'],
-        'year_start': request_json['year_start'],
-        'year_end': request_json['year_end']
+        'year_start': request_json['year_start'] if request_json['year_start'] != '' else 1800,
+        'year_end': request_json['year_end'] if request_json['year_end'] != '' else 2050,
+        'page': request_json['page'] if request_json['page'] != '' else 1
     }
 
     new_search = Search(
@@ -48,8 +52,8 @@ def search_now():
         photographer=request_json['photographer'],
         secondary_creator=request_json['secondary_creator'],
         title=request_json['title'],
-        year_start=request_json['year_start'],
-        year_end=request_json['year_end']
+        year_start=request_json['year_start'] if request_json['year_start'] != '' else 1800,
+        year_end=request_json['year_end'] if request_json['year_end'] != '' else 2050
     )
 
     if request_json['user_id'] != -1:
@@ -70,18 +74,36 @@ def search_now():
 
     query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
     result = query.json()
-    received_res = result['collection']['items']  ##storing search results until all are accumulated
-    num_p_extra = result['collection']['metadata']['total_hits'] // 100  ##number of more pages to load data from
+    try:
+        received_res = {1: result['collection']['items']}  ##storing search results until all are accumulated
+        num_p_extra = result['collection']['metadata']['total_hits'] // 100  ##number of more pages to load data from
+    except Exception:
+        raise Exception(result)
 
-    for i in range(2, num_p_extra + 2):
-        map_to_send['page'] = i
-        query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
-        result = query.json()
-        received_res += result['collection']['items']
+    # async def add_data(page_num):
+    #     map_to_send['page'] = page_num
+    #     query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
+    #     result = query.json()
+    #     received_res[page_num] = result['collection']['items']
+    #
+    # async def data_runner():
+    #     tasks = []
+    #     for i in range(2, num_p_extra + 2):
+    #         tasks.append(asyncio.ensure_future(add_data(i)))
+    #     await asyncio.gather(*tasks)
+    #
+    # loop = asyncio.new_event_loop()
+    # asyncio.set_event_loop(loop)
+    # loop.run_until_complete(data_runner())
+    # loop.close()
+
+    final_res = received_res[1]
+    # for i in range(1, num_p_extra + 2):
+    #     final_res += received_res[i]
 
     num_res = 0
 
-    for each in received_res:
+    for each in final_res:
         if (Result.query.filter_by(nasa_id=each['data'][0]['nasa_id'])).first() is None:
             new_res = Result(
                 name=each['data'][0]['title'],
@@ -101,11 +123,15 @@ def search_now():
             num_res += 1
     db.session.commit()
 
+    for each in final_res:
+        curr = Result.query.filter_by(nasa_id=each['data'][0]['nasa_id']).first()
+        each['res_id'] = curr.id
+
     return json.dumps({
-        'data': received_res,
+        'data': final_res,
         'num_res': num_res,
         'num_ret': result['collection']['metadata']['total_hits']
-        }
+    }
     )
 
 
@@ -127,6 +153,7 @@ def add_to_favorite():
 
     return json.dumps({'status': 1})
 
+
 @events.route('/result/unfav', methods=['POST', 'GET'])
 def remove_from_favorite():
     request_json = request.get_json()
@@ -138,7 +165,7 @@ def remove_from_favorite():
         return json.dumps({'status': 0, 'error': "User Not Authenticated"})
 
     res_id = request_json['res_id']
-    res = Result.query.filter_by(id=res_id).first()
+    res = Result.query.filter_by(id=res_id, status=True).first()
 
     if res is None:
         return json.dumps({'status': 0, 'error': "Incorrect Parameters Provided. Please contact system administrator."})
@@ -165,12 +192,12 @@ def show_all_favorites():
     if user is None:
         return json.dumps({'status': 0, 'error': "User Not Authenticated"})
 
-    all_favs = Fav.query.filter_by(user_id=user.id)
+    all_favs = Fav.query.filter_by(user_id=user.id, status=True)
 
     final_res = []
 
     for each in all_favs:
-        result = Result.query.filter_by(id=each.res_id)
+        result = Result.query.filter_by(id=each.res_id).first()
         final_res.append({
             'id': result.id,
             'name': result.name,
@@ -199,7 +226,7 @@ def add_to_stream():
     location = request_json['location']
     media_type = request_json['media_type']
     photographer = request_json['photographer']
-    keywords = request_json['keywords'] ##list of keywords
+    keywords = request_json['keywords']  ##list of keywords
 
     new_stream = SearchStream(
         q=q,
@@ -252,6 +279,29 @@ def remove_from_stream():
     return json.dumps({'status': 1})
 
 
+@events.route('/result/stream/all', methods=['POST'])
+def show_all_streams():
+    request_json = request.get_json()
+
+    auth_token = request_json['auth_token']
+    user = User.verify_auth_token(auth_token)
+
+    if user is None:
+        return json.dumps({'status': 0, 'error': "User credentials invalid"})
+
+    all_ss = SearchStream.query.filter_by(user_id=user.id, status=True)
+    final_list = []
+    for each in all_ss:
+        final_list.append({
+            'id': each.id,
+            'q': each.q,
+            'center': each.center,
+            'location': each.location
+        })
+
+    return json.dumps({'data': final_list})
+
+
 @events.route('/result/stream', methods=['GET'])
 def stream():
     all_ss = SearchStream.query.filter_by(status=True)
@@ -263,36 +313,110 @@ def stream():
             'center': ss.center,
             'location': ss.location,
             'media_type': ss.media_type,
-            'photograph': ss.photograph,
+            'photographer': ss.photographer,
             'keywords': ",".join([Keyword.query.filter_by(id=x.kw_id).first().name
                                   for x in SearchKeywordRel.query.filter_by(ss_id=ss.id)])
         }
 
-        curr_user = ss.user_id
+        if not ss.first_time:
+            ss.first_time = False
+        else:
+            curr_user = ss.user_id
+
+            map_to_send = {}
+            for each in map_received:
+                if map_received[each] != '':
+                    map_to_send[each] = map_received[each]
+
+            query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
+            result = query.json()
+            received_res = result['collection']['items']  ##storing search results until all are accumulated
+            num_p_extra = result['collection']['metadata'][
+                              'total_hits'] // 100  ##number of more pages to load data from
+
+            for i in range(2, num_p_extra + 2):
+                map_to_send['page'] = i
+                query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'],
+                                     params=map_to_send)
+                result = query.json()
+                received_res += result['collection']['items']
+
+            new_adds = []
+
+            for each in received_res:
+                if (StreamResult.query.filter_by(nasa_id=each['data'][0]['nasa_id'])).first() is None:
+                    new_res = StreamResult(
+                        name=each['data'][0]['title'],
+                        center=each['data'][0]['center']
+                        if each['data'][0].get('center') is not None else "No Center Information Provided",
+                        last_updated=datetime.strptime(each['data'][0]['date_created'], "%Y-%m-%dT%H:%M:%SZ"),
+                        thumb_img=([x['href'] for x in each['links']
+                                    if x.get('render') is not None and x['render'] == "image"][0])
+                        if each.get('links') is not None else "",
+                        description=((each['data'][0]['description'])
+                                     if len(each['data'][0]['description']) <= 16383
+                                     else each['data'][0]['description'][:16379] + "...")
+                        if each['data'][0].get('description') is not None else "",
+                        nasa_id=each['data'][0]['nasa_id']
+                    )
+                    new_adds.append(new_res)
+
+            new_add_str = "\n".join(
+                [(current_app.config['CURRENT_URL'] + current_app.config['IMG_URL'] + str(x.id)) for x in new_adds]
+            )
+
+            num_adds += len(new_adds)
+
+            if len(new_adds) != 0:
+                num_stream_sends += 1
+                msg = Message('Investoreal Login Credentials', sender='rachitbhargava99@gmail.com',
+                              recipients=[curr_user.email])
+                msg.body = f'''Hi {curr_user.name},
+
+New images matching your query were recently added by NASA.
+
+Below-mentioned are links to the images that were added.
+{new_add_str}
+
+Cheers,
+Spindler Team'''
+                mail.send(msg)
+
+    for ss in all_ss:
+        map_received = {
+            'q': ss.q,
+            'center': ss.center,
+            'location': ss.location,
+            'media_type': ss.media_type,
+            'photographer': ss.photographer,
+            'keywords': ",".join([Keyword.query.filter_by(id=x.kw_id).first().name
+                                  for x in SearchKeywordRel.query.filter_by(ss_id=ss.id)])
+        }
 
         map_to_send = {}
         for each in map_received:
             if map_received[each] != '':
                 map_to_send[each] = map_received[each]
 
-        query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
+        query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'],
+                             params=map_to_send)
         result = query.json()
         received_res = result['collection']['items']  ##storing search results until all are accumulated
-        num_p_extra = result['collection']['metadata']['total_hits'] // 100  ##number of more pages to load data from
+        num_p_extra = result['collection']['metadata'][
+                          'total_hits'] // 100  ##number of more pages to load data from
 
         for i in range(2, num_p_extra + 2):
             map_to_send['page'] = i
-            query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'], params=map_to_send)
+            query = requests.get(current_app.config['BASE_URL'] + current_app.config['SEARCH_URL'],
+                                 params=map_to_send)
             result = query.json()
             received_res += result['collection']['items']
 
         num_res = 0
 
-        new_adds = []
-
         for each in received_res:
-            if (Result.query.filter_by(nasa_id=each['data'][0]['nasa_id'])).first() is None:
-                new_res = Result(
+            if (StreamResult.query.filter_by(nasa_id=each['data'][0]['nasa_id'])).first() is None:
+                new_res = StreamResult(
                     name=each['data'][0]['title'],
                     center=each['data'][0]['center']
                     if each['data'][0].get('center') is not None else "No Center Information Provided",
@@ -306,31 +430,10 @@ def stream():
                     if each['data'][0].get('description') is not None else "",
                     nasa_id=each['data'][0]['nasa_id']
                 )
-                new_adds.append(new_res)
                 db.session.add(new_res)
                 num_res += 1
+
         db.session.commit()
-
-        new_add_str = "\n".join(
-            (current_app.config['CURRENT_URL'] + current_app.config['IMG_URL'] + str(x.id)) for x in new_adds
-        )
-
-        num_adds += len(new_adds)
-
-        if len(new_adds) != 0:
-            num_stream_sends += 1
-            msg = Message('Investoreal Login Credentials', sender='rachitbhargava99@gmail.com',
-                          recipients=[curr_user.email])
-            msg.body = f'''Hi {curr_user.name},
-
-New images matching your query were recently added by NASA.
-
-Below-mentioned are links to the images that were added.
-{new_add_str}
-
-Cheers,
-Spindler Team'''
-            mail.send(msg)
 
     return json.dumps({'status': 1, 'num_adds': num_adds, 'num_stream_sends': num_stream_sends})
 
@@ -349,7 +452,9 @@ def get_search_history():
     final_res = []
 
     for each in all_search:
-        final_res.append({'id': each.id, 'q': each.q, 'timestamp': each.timestamp})
+        final_res.append({'id': each.id, 'q': each.q, 'timestamp': each.timestamp.strftime("%B %d, %Y %H:%M:%S")})
+
+    final_res.reverse()
 
     return json.dumps({'status': 1, 'data': final_res})
 
@@ -360,8 +465,8 @@ def get_most_searched():
     final_dict = {}
 
     for each in all_search:
-        final_dict[each.name.lower()] = final_dict[each.name.lower()] + 1\
-            if final_dict.get(each.name.lower()) is not None else 1
+        final_dict[each.q.lower()] = final_dict[each.q.lower()] + 1 \
+            if final_dict.get(each.q.lower()) is not None else 1
 
     final_tup = [(final_dict[x], x) for x in final_dict]
     final_tup.sort(reverse=True)

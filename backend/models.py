@@ -74,6 +74,7 @@ class SearchStream(db.Model):
     photographer = db.Column(db.String(127), nullable=False, default="")
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     status = db.Column(db.Boolean, nullable=False, default=True)
+    first_time = db.Column(db.Boolean, nullable=False, default=True)
 
 
 class Keyword(db.Model):
@@ -101,7 +102,7 @@ class Search(db.Model):
     title = db.Column(db.String(1023), nullable=True)
     year_start = db.Column(db.Integer, nullable=True)
     year_end = db.Column(db.Integer, nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.now())
 
 
@@ -109,3 +110,13 @@ class SearchKeyRel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     se_id = db.Column(db.Integer, db.ForeignKey('search.id'), nullable=False)
     kw_id = db.Column(db.Integer, db.ForeignKey('keyword.id'), nullable=False)
+
+
+class StreamResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(1023), nullable=True)
+    center = db.Column(db.String(127), nullable=True)
+    last_updated = db.Column(db.DateTime, nullable=True, default=datetime.now())
+    thumb_img = db.Column(db.String(1023), nullable=False)
+    description = db.Column(db.Text(16383), nullable=True)
+    nasa_id = db.Column(db.String(1023), nullable=False, unique=True)
