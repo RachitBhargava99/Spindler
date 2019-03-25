@@ -1,17 +1,13 @@
-from flask import Blueprint, request, current_app
+from flask import Blueprint, request
 from backend.models import User
-from backend import db, bcrypt, mail
+from backend import db, bcrypt
 import json
 from backend.users.utils import send_reset_email
-from datetime import datetime, timedelta
-from sqlalchemy import and_, or_
-from flask_mail import Message
-import random
-import string
 
 users = Blueprint('users', __name__)
 
 
+# End-point to enable a user to log in to the website
 @users.route('/login', methods=['GET', 'POST'])
 def login():
     request_json = request.get_json()
@@ -36,6 +32,7 @@ def login():
         return json.dumps(final_dict)
 
 
+# End-point to enable a user to register on the website
 @users.route('/register', methods=['GET', 'POST'])
 def normal_register():
     request_json = request.get_json()
@@ -52,6 +49,7 @@ def normal_register():
     return json.dumps({'id': user.id, 'status': 1})
 
 
+# End-point to enable a user to change their access level to administrator
 @users.route('/admin/add', methods=['GET', 'POST'])
 def master_add():
     request_json = request.get_json()
@@ -61,6 +59,7 @@ def master_add():
     return json.dumps({'status': 1})
 
 
+# End-point to enable a user to request a new password
 @users.route('/password/request_reset', methods=['GET', 'POST'])
 def request_reset_password():
     request_json = request.get_json()
@@ -72,6 +71,7 @@ def request_reset_password():
         return json.dumps({'status': 0, 'error': "User Not Found"})
 
 
+# End-point to enable a user to verify their password reset request
 @users.route('/backend/password/verify_token', methods=['GET', 'POST'])
 def verify_reset_token():
     request_json = request.get_json()
@@ -82,10 +82,11 @@ def verify_reset_token():
         return json.dumps({'status': 1})
 
 
+# End-point to enable a user to set up a new password
 @users.route('/backend/password/reset', methods=['GET', 'POST'])
 def reset_password():
     request_json = request.get_json()
-    user = User.verify_reset_token(token)
+    user = User.verify_reset_token(request_json['token'])
     if user is None:
         return json.dumps({'status': 0,
                            'error': "Sorry, the link is invalid or has expired. Please submit password reset request again."})
@@ -96,6 +97,7 @@ def reset_password():
         return json.dumps({'status': 1})
 
 
+# Checker to see if the server is up and running
 @users.route('/test', methods=['GET'])
 def test():
     return "Hello World"

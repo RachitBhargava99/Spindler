@@ -1,4 +1,4 @@
-from backend import mail, db
+from backend import mail
 from flask import url_for
 from flask_mail import Message
 

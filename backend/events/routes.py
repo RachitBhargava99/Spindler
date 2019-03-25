@@ -3,23 +3,20 @@ from backend.models import User, Result, Fav, SearchStream, Keyword, SearchKeywo
     StreamResult
 from backend import db, mail
 import json
-from sqlalchemy import and_
-import geocoder
 import requests
-from backend import config
-from datetime import timedelta, datetime
+from datetime import datetime
 from flask_mail import Message
-from backend.events.utils import get_metadata
-import asyncio
 
 events = Blueprint('queues', __name__)
 
 
+# Checker to see whether or not is the server running
 @events.route('/event', methods=['GET'])
 def checker():
     return "Hello"
 
 
+# End-point for all the search queries
 @events.route('/search', methods=['POST'])
 def search_now():
     request_json = request.get_json()
@@ -135,6 +132,7 @@ def search_now():
     )
 
 
+# End-point to add a result to the user's list of favorites
 @events.route('/result/fav', methods=['POST'])
 def add_to_favorite():
     request_json = request.get_json()
@@ -154,6 +152,7 @@ def add_to_favorite():
     return json.dumps({'status': 1})
 
 
+# End-point to remove a result from the user's list of favorites
 @events.route('/result/unfav', methods=['POST', 'GET'])
 def remove_from_favorite():
     request_json = request.get_json()
@@ -165,7 +164,7 @@ def remove_from_favorite():
         return json.dumps({'status': 0, 'error': "User Not Authenticated"})
 
     res_id = request_json['res_id']
-    res = Result.query.filter_by(id=res_id, status=True).first()
+    res = Result.query.filter_by(id=res_id).first()
 
     if res is None:
         return json.dumps({'status': 0, 'error': "Incorrect Parameters Provided. Please contact system administrator."})
@@ -182,6 +181,7 @@ def remove_from_favorite():
     return json.dumps({'status': 1, 'fav_id': fav.id})
 
 
+# End-point to show all results a user has added to their list of favorites
 @events.route('/result/fav/show_all', methods=['POST', 'GET'])
 def show_all_favorites():
     request_json = request.get_json()
@@ -211,6 +211,7 @@ def show_all_favorites():
     return json.dumps({'status': 1, 'data': final_res})
 
 
+# End-point to start streaming a query
 @events.route('/result/stream/add', methods=['POST'])
 def add_to_stream():
     request_json = request.get_json()
@@ -254,6 +255,7 @@ def add_to_stream():
     return json.dumps({'status': 1})
 
 
+# End-point to stop streaming a query
 @events.route('/result/stream/remove', methods=['POST'])
 def remove_from_stream():
     request_json = request.get_json()
@@ -279,6 +281,7 @@ def remove_from_stream():
     return json.dumps({'status': 1})
 
 
+# End-point to show all queries a user is currently streaming
 @events.route('/result/stream/all', methods=['POST'])
 def show_all_streams():
     request_json = request.get_json()
@@ -302,6 +305,7 @@ def show_all_streams():
     return json.dumps({'data': final_list})
 
 
+# End-point to stream - run periodically
 @events.route('/result/stream', methods=['GET'])
 def stream():
     all_ss = SearchStream.query.filter_by(status=True)
@@ -438,6 +442,7 @@ Spindler Team'''
     return json.dumps({'status': 1, 'num_adds': num_adds, 'num_stream_sends': num_stream_sends})
 
 
+# End-point to check a user's search history
 @events.route('/search/history', methods=['POST'])
 def get_search_history():
     request_json = request.get_json()
@@ -459,6 +464,7 @@ def get_search_history():
     return json.dumps({'status': 1, 'data': final_res})
 
 
+# End-point to check most searched queries
 @events.route('/search/most', methods=['GET'])
 def get_most_searched():
     all_search = Search.query.all()
